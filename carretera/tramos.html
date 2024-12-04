@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tramos prioritarios</title>
+    <link rel='stylesheet' href='https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css' />
+    <script src='https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js'></script>
+    <script src="https://unpkg.com/pmtiles@3.0.6/dist/pmtiles.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        html,
+        body,
+        #map {
+            height: 100%;
+        }
+
+        .info-box {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background-color: white;
+            border: 2px solid #ccc;
+            border-radius: 10px;
+            padding: 15px;
+            width: 250px;
+            font-family: 'Space Grotesk', sans-serif;
+            box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            transition: height 0.5s ease, padding 0.5s ease, transform 0.5s ease;
+            /* Agrega la animación */
+            /* Espacio entre elementos */
+        }
+
+        .info-box h2 {
+            font-weight: bold;
+            font-size: 18px;
+            margin: 0;
+        }
+
+        .info-box .legend {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .legend div {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .legend .color-box {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+        }
+
+        .circle-legend {
+            margin-top: 20px;
+        }
+
+        .circle-legend div {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .circle {
+            display: inline-block;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+
+        .small-circle {
+            width: 10px;
+            height: 10px;
+            background-color: #42B7B9;
+        }
+
+        .medium-circle {
+            width: 15px;
+            height: 15px;
+            background-color: #E4C1D9;
+        }
+
+        .large-circle {
+            width: 20px;
+            height: 20px;
+            background-color: #C75DAB;
+        }
+
+        .switch-group {
+            display: flex;
+            flex-direction: column;
+            /* Los switches estarán en columna */
+            gap: 5px;
+            /* Espaciado entre switches */
+        }
+
+        .switch-container {
+            display: flex;
+            justify-content: space-between;
+            /* Alinea la etiqueta y el switch */
+            align-items: center;
+            /* Asegura que estén alineados verticalmente */
+            margin-top: 0;
+            /* Ajusta el espacio superior */
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 34px;
+            height: 20px;
+            margin-left: 10px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 14px;
+            width: 14px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        .circle-october {
+            background-color: black;
+        }
+
+        .circle-november {
+            background-color: red;
+        }
+
+        input:checked+.slider {
+            background-color: #2196F3;
+        }
+
+        input:checked+.slider:before {
+            transform: translateX(14px);
+        }
+
+        .hamburger {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            /* Colocado en la esquina superior derecha */
+            font-size: 25px;
+            background-color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 5px;
+            cursor: pointer;
+            z-index: 1000;
+        }
+
+        .info-box.collapsed {
+            height: 25px;
+            /* Tamaño reducido cuando está colapsado */
+            overflow: hidden;
+            /* Oculta el contenido sobrante */
+            transition: height 0.5s ease;
+            transition: height 0.5s ease, padding 0.5s ease;
+            /* Transición suave */
+            display: flex;
+            /* Alinear el contenido */
+            align-items: right;
+            /* Centrar verticalmente */
+            justify-content: space-between;
+            /* Separar el título y el botón */
+            padding: 10px;
+            /* Reduce el padding al colapsarse */
+        }
+
+        .info-box.collapsed .hamburger {
+            position: static;
+            /* Elimina restricciones de posicionamiento */
+            margin: auto;
+            /* Centra automáticamente dentro del contenedor */
+            display: flex;
+            justify-content: center;
+            /* Centra horizontalmente */
+            align-items: center;
+            /* Centra verticalmente */
+            font-size: 24px;
+            /* Ajusta el tamaño del ícono para mayor claridad */
+        }
+
+        .info-box:not(.collapsed) {
+            transform: scale(1);
+            /* Restablece el tamaño original al expandirse */
+            transition: height 0.5s ease, padding 0.5s ease, transform 0.5s ease;
+            /* Aplica animación de regreso */
+        }
+
+        /* Ajuste del contenido del recuadro cuando está colapsado */
+        .info-box.collapsed h2 {
+            font-size: 16px;
+            /* Reducir el tamaño del texto */
+            margin: 0;
+        }
+
+        .info-box.collapsed p,
+        .info-box.collapsed .legend,
+        .info-box.collapsed .circle-legend,
+        .info-box.collapsed .switch-group {
+            display: none;
+            /* Oculta todos los elementos secundarios */
+        }
+
+        /* Mantener visible el botón hamburguesa */
+        .info-box.collapsed #hamburger-menu {
+            display: block;
+            position: absolute;
+            top: 2px;
+            /* Ajusta la posición según sea necesario */
+            right: 10px;
+        }
+
+        /* Responsividad */
+        @media (max-width: 768px) {
+            .info-box {
+                width: 220px;
+                /* Más angosto para tablets */
+                padding: 8px 10px;
+                /* Menos padding */
+                font-size: 12px;
+                /* Texto más compacto */
+            }
+
+            .info-box h2 {
+                font-size: 14px;
+            }
+
+            .legend div,
+            .circle-legend div {
+                font-size: 10px;
+                /* Texto más pequeño */
+            }
+        }
+
+        @media (max-width: 480px) {
+            .info-box {
+                width: 200px;
+                /* Más pequeño para celulares */
+                padding: 8px;
+                /* Compacto */
+                top: 5px;
+                /* Más cerca del borde */
+                left: 5px;
+            }
+
+            .info-box h2 {
+                font-size: 12px;
+            }
+
+            .legend div,
+            .circle-legend div {
+                font-size: 10px;
+                /* Texto más compacto */
+            }
+
+            .legend .color-box {
+                width: 12px;
+                /* Más compacto */
+                height: 12px;
+            }
+
+            .circle {
+                width: 10px;
+                height: 10px;
+            }
+
+            @media (min-width: 768px) {
+                .hamburger {
+                    display: none;
+                }
+            }
+
+        }
+    </style>
+</head>
+
+<body>
+    <div id="map"></div>
+    <div id="info-box" class="info-box">
+        <!-- Contenido del recuadro blanco -->
+        <h2>Tramos prioritarios</h2>
+        <!-- Botón hamburguesa -->
+        <button id="hamburger-menu" class="hamburger" onclick="toggleMenu()">☰</button>
+        <p><strong>Número de incidencias por corredores carreteros comerciales</strong></p>
+        <div class="legend">
+            <div>
+                <div class="color-box" style="background-color: #f5ba98;"></div>
+                <span>0 - 2</span>
+            </div>
+            <div>
+                <div class="color-box" style="background-color: #ee8a82;"></div>
+                <span>3 - 13</span>
+            </div>
+            <div>
+                <div class="color-box" style="background-color: #dc7176;"></div>
+                <span>14 - 36</span>
+            </div>
+            <div>
+                <div class="color-box" style="background-color: #dc7176;"></div>
+                <span>37 - 70</span>
+            </div>
+            <div>
+                <div class="color-box" style="background-color: #9c3f5d;"></div>
+                <span>71 - 116</span>
+            </div>
+        </div>
+        <div class="circle-legend">
+            <h2>Concentración de incidencias</h2>
+            <div>
+                <span class="circle small-circle"></span>
+                <span>1 - 10 incidencias</span>
+            </div>
+            <div>
+                <span class="circle medium-circle"></span>
+                <span>11 - 25 incidencias</span>
+            </div>
+            <div>
+                <span class="circle large-circle"></span>
+                <span>26+ incidencias</span>
+            </div>
+        </div>
+        <div class="circle-legend">
+            <h2>Incidencias</h2>
+            <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                <span class="circle circle-october" style="width: 15px; height: 15px;"></span>
+                <span>Puntos de Octubre</span>
+            </div>
+            <div style="display: flex; align-items: center;">
+                <span class="circle circle-november" style="width: 15px; height: 15px;"></span>
+                <span>Puntos de Noviembre</span>
+            </div>
+        </div>
+        <div class="switch-group">
+            <div class="switch-container">
+                <label>Clusterización</label>
+                <label class="switch">
+                    <input type="checkbox" id="clusterSwitch" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="switch-container">
+                <label>Incidencias GN</label>
+                <label class="switch">
+                    <input type="checkbox" id="puntosSwitch" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="switch-container">
+                <label>Incidencias FGR</label>
+                <label class="switch">
+                    <input type="checkbox" id="puntosFgrSwitch" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="switch-container">
+                <label>Mostrar Tramos</label>
+                <label class="switch">
+                    <input type="checkbox" id="tramosSwitch" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Inicializar el mapa
+        const map = new maplibregl.Map({
+            container: 'map',
+            style: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
+            center: [-99.1332, 19.4326], // Coordenadas iniciales (México)
+            zoom: 6.4
+        });
+        // Crear un popup para mostrar información
+        const popup = new maplibregl.Popup({
+            closeButton: false,
+            closeOnClick: false
+        });
+
+        // Cargar y agregar puntos desde puntos.geojson con clusterización
+        fetch('./puntos.geojson')
+            .then(response => response.json())
+            .then(data => {
+                map.addSource('puntos', {
+                    type: 'geojson',
+                    data: data,
+                    cluster: true,
+                    clusterRadius: 20, // Ajustar distancia de clusterización
+                    clusterMinPoints: 2 // Mínimo de puntos para formar un clúster
+                });
+                // Capa de clusters
+                map.addLayer({
+                    id: 'clusters',
+                    type: 'circle',
+                    source: 'puntos',
+                    filter: ['has', 'point_count'],
+                    paint: {
+                        'circle-color': [
+                            'step',
+                            ['get', 'point_count'],
+                            '#42B7B9', // Clúster pequeño
+                            10,
+                            '#E4C1D9', // Clúster mediano
+                            25,
+                            '#C75DAB'  // Clúster grande
+                        ],
+                        'circle-radius': [
+                            'step',
+                            ['get', 'point_count'],
+                            15, // Clúster pequeño
+                            10,
+                            20, // Clúster mediano
+                            25,
+                            30  // Clúster grande
+                        ]
+                    }
+                });
+
+                // Capa de puntos no clusterizados
+                map.addLayer({
+                    id: 'unclustered-point',
+                    type: 'circle',
+                    source: 'puntos',
+                    filter: ['!', ['has', 'point_count']],
+                    paint: {
+                        'circle-color': '#541f3f',
+                        'circle-radius': 4,
+                        'circle-stroke-width': 1,
+                        'circle-stroke-color': '#fff'
+                    }
+                });
+
+                // Capa para mostrar todos los puntos simples
+                map.addSource('all-points', {
+                    type: 'geojson',
+                    data: data // Usar los mismos datos pero sin clusterización
+                });
+
+                map.addLayer({
+                    id: 'all-points-layer',
+                    type: 'circle',
+                    source: 'all-points',
+                    paint: {
+                        'circle-color': [
+                            'match',
+                            ['get', 'm'],
+                            10, 'black', // Color negro para M = 10
+                            11, '#eb4a40', // Color rojo para M = 11
+                            '#C75DAB' // Color por defecto si no es 10 o 11
+                        ],
+                        'circle-radius': 5
+                    },
+                    layout: {
+                        visibility: 'none' // Ocultar inicialmente
+                    }
+                });
+                // Agregar las líneas del archivo GeoJSON debajo de las capas de puntos
+                map.on('load', () => {
+                    map.addSource('tramos', {
+                        type: 'geojson',
+                        data: './tramos_lineas.geojson' // Ruta al archivo GeoJSON
+                    });
+                    // Agregar la capa con clasificación por "Incidencias"
+                    map.addLayer({
+                        id: 'tramos-layer',
+                        type: 'line',
+                        source: 'tramos',
+                        paint: {
+                            'line-color': [
+                                'step',
+                                ['get', 'Incidencias'],
+                                '#fbe6c5',  // 0 - 2
+                                2, '#f5ba98', // 2 - 13
+                                13, '#ee8a82', // 13 - 36
+                                36, '#dc7176', // 36 - 70
+                                70, '#c8586c', // 70 - 116
+                                116, '#9c3f5d' // > 116
+                            ],
+                            'line-width': [
+                                'step',
+                                ['get', 'Incidencias'],
+                                1,  // 0 - 2: grosor 2
+                                2, 1.5,  // 2 - 13: grosor 4
+                                13, 2, // 13 - 36: grosor 6
+                                36, 3, // 36 - 70: grosor 8
+                                70, 4 // > 70: grosor 10
+                            ]
+                        }
+                    });
+
+                    // Crear un popup vacío
+                    const popup = new maplibregl.Popup({
+                        closeButton: false,
+                        closeOnClick: false
+                    });
+
+                    // Mostrar información al pasar el mouse sobre las líneas
+                    map.on('mousemove', 'tramos-layer', (e) => {
+                        // Obtener propiedades de la línea seleccionada
+                        const properties = e.features[0].properties;
+
+                        // Generar contenido del popup
+                        const content = `
+            <h3 style="margin: 0; font-size: 16px; font-weight: bold;">Información del Tramo</h3>
+            <strong>Corredor:</strong> ${properties.nom_corr_t || 'Sin información'}<br>
+            <strong>Incidencias:</strong> ${properties.Incidencias || 'Sin información'}
+        `;
+                        // Configurar y mostrar el popup
+                        popup.setLngLat(e.lngLat)
+                            .setHTML(content)
+                            .addTo(map);
+                    });
+
+                    // Remover el popup cuando el mouse salga de la capa
+                    map.on('mouseleave', 'tramos-layer', () => {
+                        popup.remove();
+                    });
+                });
+                // Evento para popups en puntos simples
+                map.on('mousemove', 'all-points-layer', (e) => {
+                    const properties = e.features[0].properties;
+
+                    // Obtener las propiedades del punto
+                    const tipo = properties.tipo || 'Sin información';
+                    const carga = properties['carga (tip'] || 'Sin información';
+                    const dia = properties['dia (sem'] || 'Sin información';
+                    const origen = properties['origen del'] || 'Sin información';
+                    const marca = properties['marca'] || 'Sin información';
+
+                    // Generar contenido del popup con título
+                    const content = `
+            <div>
+                <h3 style="margin: 0; font-size: 16px; font-weight: bold;">Información de la incidencia (GN)</h3>
+                <p style="margin: 5px 0;"><strong>Tipo:</strong> ${tipo}</p>
+                <p style="margin: 5px 0;"><strong>Carga:</strong> ${carga}</p>
+                <p style="margin: 5px 0;"><strong>Día:</strong> ${dia}</p>
+                <p style="margin: 5px 0;"><strong>Origen:</strong> ${origen}</p>
+                <p style="margin: 5px 0;"><strong>Marca:</strong> ${marca}</p>
+            </div>
+        `;
+
+                    // Configurar y mostrar el popup
+                    popup.setLngLat(e.lngLat)
+                        .setHTML(content)
+                        .addTo(map);
+                });
+
+                // Remover el popup cuando el mouse salga de la capa de puntos
+                map.on('mouseleave', 'all-points-layer', () => {
+                    popup.remove();
+                });
+
+                // Cargar y agregar puntos desde puntos_fgr.geojson con clusterización
+                fetch('./puntos_fgr.geojson')
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`Error al cargar puntos_fgr.geojson: ${response.status} ${response.statusText}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        // Verifica y configura la fuente de datos con clusterización
+                        map.addSource('puntos-fgr', {
+                            type: 'geojson',
+                            data: data,
+                            cluster: true,
+                            clusterRadius: 20, // Ajustar distancia de clusterización
+                            clusterMinPoints: 2 // Mínimo de puntos para formar un clúster
+                        });
+
+                        // Capa de clusters para los puntos
+                        map.addLayer({
+                            id: 'clusters-fgr',
+                            type: 'circle',
+                            source: 'puntos-fgr',
+                            filter: ['has', 'point_count'],
+                            paint: {
+                                'circle-color': [
+                                    'step',
+                                    ['get', 'point_count'],
+                                    '#42B7B9', // Clúster pequeño
+                                    10,
+                                    '#E4C1D9', // Clúster mediano
+                                    25,
+                                    '#C75DAB'  // Clúster grande
+                                ],
+                                'circle-radius': [
+                                    'step',
+                                    ['get', 'point_count'],
+                                    15, // Clúster pequeño
+                                    10,
+                                    20, // Clúster mediano
+                                    25,
+                                    30  // Clúster grande
+                                ]
+                            }
+                        });
+
+                        // Capa de puntos no clusterizados
+                        map.addLayer({
+                            id: 'unclustered-points-fgr',
+                            type: 'circle',
+                            source: 'puntos-fgr',
+                            filter: ['!', ['has', 'point_count']],
+                            paint: {
+                                'circle-color': '#541f3f', // Color para puntos no clusterizados
+                                'circle-radius': 4,
+                                'circle-stroke-width': 1,
+                                'circle-stroke-color': '#fff'
+                            }
+                        });
+
+                        // Capa para mostrar todos los puntos simples
+                        map.addSource('all-points-fgr', {
+                            type: 'geojson',
+                            data: data // Usar los mismos datos pero sin clusterización
+                        });
+
+                        map.addLayer({
+                            id: 'all-points-layer-fgr',
+                            type: 'circle',
+                            source: 'all-points-fgr',
+                            paint: {
+                                'circle-color': [
+                                    'match',
+                                    ['get', 'mes'], // Cambia 'm' a la propiedad correcta si es necesario
+                                    10, 'black', // Color negro para M = 10
+                                    11, '#eb4a40', // Color rojo para M = 11
+                                    '#BFBFBF' // Color por defecto si no es 10 o 11
+                                ],
+                                'circle-radius': 5
+                            },
+                            layout: {
+                                visibility: 'none' // Ocultar inicialmente
+                            }
+                        });
+
+                        // Agregar un popup para puntos no clusterizados
+                        const popup = new maplibregl.Popup({
+                            closeButton: false,
+                            closeOnClick: false
+                        });
+
+                        map.on('mousemove', 'unclustered-points-fgr', (e) => {
+                            const properties = e.features[0].properties;
+
+                            const content = `
+                <div>
+                    <h3 style="margin: 0; font-size: 16px; font-weight: bold;">Información del Punto</h3>
+                    <p><strong>Autoridad:</strong> ${properties.Autoridad || 'Sin información'}</p>
+                    <p><strong>Descripción:</strong> ${properties.descripcion || 'Sin información'}</p>
+                </div>
+            `;
+
+                            popup.setLngLat(e.lngLat)
+                                .setHTML(content)
+                                .addTo(map);
+                        });
+
+                        map.on('mouseleave', 'unclustered-points-fgr', () => {
+                            popup.remove();
+                        });
+                    })
+                    .catch(error => {
+                        console.error('Error al procesar puntos_fgr.geojson:', error);
+                    });
+                // Variables para rastrear el estado de los switches
+                let puntosVisible = true;
+                let puntosFgrVisible = true;
+                let tramosVisible = true;
+
+                // Referencias a los switches
+                const clusterSwitch = document.getElementById('clusterSwitch');
+                const puntosSwitch = document.getElementById('puntosSwitch');
+                const puntosFgrSwitch = document.getElementById('puntosFgrSwitch');
+
+                // Deshabilitar los switches de inicio si la clusterización está activada
+                if (clusterSwitch.checked) {
+                    puntosSwitch.disabled = true;
+                    puntosFgrSwitch.disabled = true;
+
+                    // Opcional: Cambiar la opacidad de los switches para indicar que están deshabilitados
+                    puntosSwitch.parentElement.style.opacity = 0.5;
+                    puntosFgrSwitch.parentElement.style.opacity = 0.5;
+                }
+
+                // Alternar entre clústeres y puntos simples (switch general de clusterización)
+                clusterSwitch.addEventListener('change', () => {
+                    const showClusters = clusterSwitch.checked;
+
+                    // Mostrar/ocultar clústeres de puntos.geojson
+                    map.setLayoutProperty('clusters', 'visibility', showClusters ? 'visible' : 'none');
+                    map.setLayoutProperty('unclustered-point', 'visibility', showClusters ? 'none' : (puntosVisible ? 'visible' : 'none'));
+
+                    // Mostrar/ocultar clústeres de puntos_fgr.geojson
+                    map.setLayoutProperty('clusters-fgr', 'visibility', showClusters ? 'visible' : 'none');
+                    map.setLayoutProperty('unclustered-points-fgr', 'visibility', showClusters ? 'none' : (puntosFgrVisible ? 'visible' : 'none'));
+
+                    // Mostrar/ocultar puntos simples de puntos.geojson
+                    map.setLayoutProperty('all-points-layer', 'visibility', showClusters ? 'none' : (puntosVisible ? 'visible' : 'none'));
+
+                    // Mostrar/ocultar puntos simples de puntos_fgr.geojson
+                    map.setLayoutProperty('all-points-layer-fgr', 'visibility', showClusters ? 'none' : (puntosFgrVisible ? 'visible' : 'none'));
+
+                    // Bloquear/desbloquear switches de puntos.geojson y puntos_fgr.geojson
+                    puntosSwitch.disabled = showClusters;
+                    puntosFgrSwitch.disabled = showClusters;
+
+                    // Estilizar switches bloqueados (opcional)
+                    puntosSwitch.parentElement.style.opacity = showClusters ? 0.5 : 1; // Reduce opacidad si está bloqueado
+                    puntosFgrSwitch.parentElement.style.opacity = showClusters ? 0.5 : 1; // Reduce opacidad si está bloqueado
+                });
+
+                // Switch para puntos.geojson
+                puntosSwitch.addEventListener('change', () => {
+                    puntosVisible = puntosSwitch.checked;
+
+                    // Mostrar/ocultar puntos simples de puntos.geojson solo si la clusterización está desactivada
+                    if (!clusterSwitch.checked) {
+                        map.setLayoutProperty('all-points-layer', 'visibility', puntosVisible ? 'visible' : 'none');
+                    }
+                });
+
+                // Switch para puntos_fgr.geojson
+                puntosFgrSwitch.addEventListener('change', () => {
+                    puntosFgrVisible = puntosFgrSwitch.checked;
+
+                    // Mostrar/ocultar puntos simples de puntos_fgr.geojson solo si la clusterización está desactivada
+                    if (!clusterSwitch.checked) {
+                        map.setLayoutProperty('all-points-layer-fgr', 'visibility', puntosFgrVisible ? 'visible' : 'none');
+                    }
+                });
+
+
+                // Switch para tramos_lineas.geojson
+                const tramosSwitch = document.getElementById('tramosSwitch');
+                tramosSwitch.addEventListener('change', () => {
+                    tramosVisible = tramosSwitch.checked;
+
+                    // Mostrar/ocultar la capa de tramos
+                    map.setLayoutProperty('tramos-layer', 'visibility', tramosVisible ? 'visible' : 'none');
+                });
+
+                // Eventos para clústeres de puntos.geojson
+                map.on('click', 'clusters', async (e) => {
+                    const features = map.queryRenderedFeatures(e.point, { layers: ['clusters'] });
+                    const clusterId = features[0].properties.cluster_id;
+                    const zoom = await map.getSource('puntos').getClusterExpansionZoom(clusterId);
+
+                    map.easeTo({
+                        center: features[0].geometry.coordinates,
+                        zoom: zoom
+                    });
+                });
+
+                map.on('mouseenter', 'clusters', () => {
+                    map.getCanvas().style.cursor = 'pointer';
+                });
+
+                map.on('mouseleave', 'clusters', () => {
+                    map.getCanvas().style.cursor = '';
+                });
+
+                // Eventos para clústeres de puntos_fgr.geojson
+                map.on('click', 'clusters-fgr', async (e) => {
+                    const features = map.queryRenderedFeatures(e.point, { layers: ['clusters-fgr'] });
+                    const clusterId = features[0].properties.cluster_id;
+                    const zoom = await map.getSource('puntos-fgr').getClusterExpansionZoom(clusterId);
+
+                    map.easeTo({
+                        center: features[0].geometry.coordinates,
+                        zoom: zoom
+                    });
+                });
+
+                map.on('mouseenter', 'clusters-fgr', () => {
+                    map.getCanvas().style.cursor = 'pointer';
+                });
+
+                map.on('mouseleave', 'clusters-fgr', () => {
+                    map.getCanvas().style.cursor = '';
+                });
+
+
+                // Evento para popups en puntos simples
+                map.on('mousemove', 'all-points-layer-fgr', (e) => {
+                    const properties = e.features[0].properties;
+
+                    // Obtener las propiedades del punto
+                    const tipo = properties.Tipo || 'Sin información';
+                    const carga = properties['Carga (tip'] || 'Sin información';
+                    const dia = properties['Dia (sem'] || 'Sin información';
+                    const origen = properties['Origen del'] || 'Sin información';
+                    const marca = properties['Marca'] || 'Sin información';
+
+                    // Generar contenido del popup con título
+                    const content = `
+            <div>
+                <h3 style="margin: 0; font-size: 16px; font-weight: bold;">Información de la incidencia (FGR)</h3>
+                <p style="margin: 5px 0;"><strong>Tipo:</strong> ${tipo}</p>
+                <p style="margin: 5px 0;"><strong>Carga:</strong> ${carga}</p>
+                <p style="margin: 5px 0;"><strong>Día:</strong> ${dia}</p>
+                <p style="margin: 5px 0;"><strong>Origen:</strong> ${origen}</p>
+                <p style="margin: 5px 0;"><strong>Marca:</strong> ${marca}</p>
+            </div>
+        `;
+
+                    // Configurar y mostrar el popup
+                    popup.setLngLat(e.lngLat)
+                        .setHTML(content)
+                        .addTo(map);
+                });
+
+                // Remover el popup cuando el mouse salga de la capa de puntos
+                map.on('mouseleave', 'all-points-layer-fgr', () => {
+                    popup.remove();
+                });
+                const hamburgerMenu = document.getElementById('hamburger-menu');
+                const infoBox = document.getElementById('info-box');
+
+                hamburgerMenu.addEventListener('click', () => {
+                    infoBox.classList.toggle('collapsed'); // Alternar la clase "collapsed"
+
+                    // Cambiar el texto del botón dependiendo del estado
+                    if (infoBox.classList.contains('collapsed')) {
+                        hamburgerMenu.textContent = '☰'; // Icono hamburguesa
+                    } else {
+                        hamburgerMenu.textContent = '☰'; // Icono de cerrar
+                    }
+                });
+            });
+    </script>
+</body>
+
+</html>

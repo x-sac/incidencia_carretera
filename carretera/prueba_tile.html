@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tramos prioritarios</title>
+    <link rel='stylesheet' href='https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css' />
+    <script src='https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js'></script>
+    <script src="https://unpkg.com/pmtiles@3.0.6/dist/pmtiles.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        html,
+        body,
+        #map {
+            height: 100%;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="map"></div>
+    <script>
+        // Configurar el protocolo PMTiles
+        const protocol = new pmtiles.Protocol();
+        maplibregl.addProtocol('pmtiles', protocol.tile);
+
+        // Ruta al archivo PMTiles local
+        const PMTILES_URL = './tramos_lineas.pmtiles';
+
+        const p = new pmtiles.PMTiles(PMTILES_URL);
+
+        // Agregar el protocolo
+        protocol.add(p);
+
+        // Inicializar el mapa
+        const map = new maplibregl.Map({
+            container: 'map',
+            style: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
+            center: [-99.1332, 19.4326], // Coordenadas iniciales (Ciudad de México)
+            zoom: 6.4
+        });
+
+        // Agregar la fuente de PMTiles
+        map.on('load', () => {
+            map.addSource('tramos_lineas', {
+                type: 'vector',
+                url: `pmtiles://${PMTILES_URL}`
+            });
+
+            // Agregar la capa de líneas con clasificación
+            map.addLayer({
+                id: 'tramos-layer',
+                type: 'line',
+                source: 'tramos_lineas',
+                'source-layer': 'default', // Cambiar si el nombre del source-layer es diferente
+                paint: {
+                    'line-color': [
+                        'step',
+                        ['get', 'incidencias'], // Cambiar "incidencias" por el nombre correcto de la propiedad
+                        '#fbe6c5', 2, 
+                        '#f5ba98', 13, 
+                        '#ee8a82', 36, 
+                        '#dc7176', 70, 
+                        '#c8586c', 116, 
+                        '#9c3f5d'
+                    ],
+                    'line-width': 2
+                }
+            });
+
+            console.log('Capa de tramos agregada correctamente');
+        });
+
+        // Manejo de errores en el mapa
+        map.on('error', (e) => {
+            console.error('Error al cargar el mapa:', e);
+        });
+    </script>
+</body>
+
+</html>
